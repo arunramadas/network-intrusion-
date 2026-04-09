@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SentinelNet - Intrusion Detection System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background: #000;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        /* Matrix-style green code rain canvas */
+        
+        #matrix-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            opacity: 0.55;
+        }
+        /* Dark radial overlay for depth */
+        
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.5) 50%, rgba(0, 0, 0, 0.85) 100%);
+            z-index: 2;
+        }
+        /* Scanline effect */
+        
+        .scanlines {
+            position: absolute;
+            inset: 0;
+            z-index: 3;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.07) 2px, rgba(0, 0, 0, 0.07) 4px);
+            pointer-events: none;
+        }
+        /* Hooded figure silhouette */
+        
+        .figure-container {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 4;
+            width: 380px;
+            height: 65vh;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        
+        .figure-svg {
+            width: 100%;
+            height: 100%;
+            opacity: 0.82;
+            filter: drop-shadow(0 0 18px rgba(0, 255, 80, 0.25));
+        }
+        /* Floating code panels (like the image) */
+        
+        .code-panel {
+            position: absolute;
+            z-index: 5;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 10px;
+            line-height: 1.6;
+            color: #00ff41;
+            opacity: 0.45;
+            pointer-events: none;
+            text-shadow: 0 0 4px #00ff41;
+            white-space: pre;
+        }
+        
+        .panel-left {
+            left: 2%;
+            top: 8%;
+            text-align: left;
+        }
+        
+        .panel-right {
+            right: 2%;
+            top: 5%;
+            text-align: left;
+        }
+        
+        .panel-left2 {
+            left: 1%;
+            bottom: 18%;
+            font-size: 9px;
+            opacity: 0.3;
+        }
+        
+        .panel-right2 {
+            right: 1%;
+            bottom: 22%;
+            font-size: 9px;
+            opacity: 0.3;
+        }
+        /* Main UI */
+        
+        .main-ui {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+        }
+        /* Top status bar */
+        
+        .status-bar {
+            font-size: 11px;
+            color: #00ff41;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            opacity: 0.7;
+            animation: blink-slow 3s step-end infinite;
+        }
+        
+        @keyframes blink-slow {
+            0%,
+            90%,
+            100% {
+                opacity: 0.7;
+            }
+            95% {
+                opacity: 0.2;
+            }
+        }
+        /* Logo */
+        
+        .logo {
+            font-family: 'Orbitron', monospace;
+            font-size: clamp(2.8rem, 7vw, 5.5rem);
+            font-weight: 900;
+            color: #cc0000;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            line-height: 1;
+            text-shadow: 0 0 20px rgba(200, 0, 0, 0.9), 0 0 40px rgba(200, 0, 0, 0.5), 0 0 80px rgba(200, 0, 0, 0.2);
+            animation: logo-flicker 6s infinite;
+        }
+        
+        @keyframes logo-flicker {
+            0%,
+            19%,
+            21%,
+            23%,
+            25%,
+            54%,
+            56%,
+            100% {
+                text-shadow: 0 0 20px rgba(200, 0, 0, 0.9), 0 0 40px rgba(200, 0, 0, 0.5);
+            }
+            20%,
+            24%,
+            55% {
+                text-shadow: none;
+                color: #880000;
+            }
+        }
+        /* Subtitle */
+        
+        .subtitle {
+            font-size: clamp(0.75rem, 2vw, 1rem);
+            color: #00ff41;
+            letter-spacing: 5px;
+            text-transform: uppercase;
+            margin-top: 10px;
+            margin-bottom: 6px;
+            opacity: 0.85;
+        }
+        /* Divider line */
+        
+        .divider {
+            width: 280px;
+            height: 1px;
+            background: linear-gradient(to right, transparent, #00ff41, transparent);
+            margin: 14px 0;
+            opacity: 0.5;
+        }
+        /* System status line */
+        
+        .sys-status {
+            font-size: 11px;
+            color: #00cc33;
+            letter-spacing: 2px;
+            opacity: 0.6;
+            margin-bottom: 28px;
+        }
+        
+        .sys-status span {
+            color: #ff4444;
+        }
+        /* Buttons */
+        
+        .btn-row {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        
+        .btn {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 13px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: #00ff41;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #00ff41;
+            padding: 14px 28px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            position: relative;
+            overflow: hidden;
+            clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+            transition: all 0.25s ease;
+        }
+        
+        .btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: #00ff41;
+            transform: translateX(-101%);
+            transition: transform 0.25s ease;
+            z-index: -1;
+        }
+        
+        .btn:hover {
+            color: #000;
+            text-shadow: none;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.6);
+        }
+        
+        .btn:hover::before {
+            transform: translateX(0);
+        }
+        
+        .btn-danger {
+            color: #ff3300;
+            border-color: #ff3300;
+        }
+        
+        .btn-danger::before {
+            background: #ff3300;
+        }
+        
+        .btn-danger:hover {
+            color: #000;
+            box-shadow: 0 0 20px rgba(255, 51, 0, 0.6);
+        }
+        /* Bottom team strip */
+        
+        .team-strip {
+            margin-top: 32px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 11px;
+            color: #336633;
+            letter-spacing: 3px;
+        }
+        
+        .team-sep {
+            color: #225522;
+        }
+        /* Corner brackets decoration */
+        
+        .corner {
+            position: absolute;
+            z-index: 8;
+            width: 40px;
+            height: 40px;
+            opacity: 0.5;
+        }
+        
+        .corner-tl {
+            top: 20px;
+            left: 20px;
+            border-top: 1px solid #00ff41;
+            border-left: 1px solid #00ff41;
+        }
+        
+        .corner-tr {
+            top: 20px;
+            right: 20px;
+            border-top: 1px solid #00ff41;
+            border-right: 1px solid #00ff41;
+        }
+        
+        .corner-bl {
+            bottom: 20px;
+            left: 20px;
+            border-bottom: 1px solid #00ff41;
+            border-left: 1px solid #00ff41;
+        }
+        
+        .corner-br {
+            bottom: 20px;
+            right: 20px;
+            border-bottom: 1px solid #00ff41;
+            border-right: 1px solid #00ff41;
+        }
+        /* Targeting reticle behind logo */
+        
+        .reticle {
+            position: absolute;
+            z-index: 4;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 320px;
+            height: 320px;
+            border-radius: 50%;
+            border: 1px solid rgba(180, 0, 0, 0.25);
+            box-shadow: 0 0 0 1px rgba(180, 0, 0, 0.1) inset;
+            animation: spin-slow 30s linear infinite;
+            pointer-events: none;
+        }
+        
+        .reticle::before {
+            content: '';
+            position: absolute;
+            inset: 20px;
+            border-radius: 50%;
+            border: 1px solid rgba(180, 0, 0, 0.15);
+        }
+        
+        @keyframes spin-slow {
+            to {
+                transform: translate(-50%, -50%) rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Matrix rain canvas -->
+    <canvas id="matrix-canvas"></canvas>
+
+    <!-- Overlays -->
+    <div class="overlay"></div>
+    <div class="scanlines"></div>
+
+    <!-- Floating code panels -->
+    <div class="code-panel panel-left">&lt;div class="AlertDropdown"&gt; &lt;button type="button"&gt; &lt;span&gt;Alerts&lt;/span&gt; &lt;/button&gt; function detectIntrusion() { if (packet.origin !== trusted) { firewall.block(packet.ip); log.write(ALERT, packet); } }
+    </div>
+
+    <div class="code-panel panel-right">max-height: 30px; overflow: hidden; padding: 10px 0; border: 2px solid #a04040; #firewall #1 { } overflow: auto; padding: 10px 0; SELECT * FROM logs WHERE threat_level &gt; 3 AND status = 'active' ORDER BY timestamp DESC;</div>
+
+    <div class="code-panel panel-left2">img src="https://media.cdn" class="ShieldModule" &lt;input element type="text" &lt;div class="TableContainer"</div>
+
+    <div class="code-panel panel-right2">id="heightContainer" class &lt;div class="FlexModule"&gt; border-bottom: 2px solid &lt;TableMask data-id</div>
+
+
+
+    <!-- Hooded figure SVG -->
+    <div class="figure-container">
+        <svg class="figure-svg" viewBox="0 0 380 520" xmlns="http://www.w3.org/2000/svg" fill="none">
+            <defs>
+                <linearGradient id="figGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#1a1a1a" />
+                    <stop offset="60%" stop-color="238a0e" />
+                    <stop offset="100%" stop-color="#000" />
+                </linearGradient>
+                <radialGradient id="glowFace" cx="50%" cy="35%" r="30%">
+                    <stop offset="0%" stop-color="238a0e" stop-opacity="0.4" />
+                    <stop offset="100%" stop-color="transparent" />
+                </radialGradient>
+            </defs>
+            <!-- Body / cloak -->
+            <path
+                d="M190 40 C140 60 80 100 60 180 C40 260 30 350 20 520 L360 520 C350 350 340 260 320 180 C300 100 240 60 190 40Z"
+                fill="url(#figGrad)" stroke="#1a2e1a" stroke-width="1" />
+            <!-- Hood -->
+            <path
+                d="M190 10 C140 10 100 40 95 80 C90 120 100 140 120 155 C140 170 160 175 190 175 C220 175 240 170 260 155 C280 140 290 120 285 80 C280 40 240 10 190 10Z"
+                fill="#111" stroke="#1a2e1a" stroke-width="1" />
+            <!-- Hood shadow / depth -->
+            <path
+                d="M160 90 C160 90 165 130 175 145 C185 160 195 165 190 175 C180 165 165 155 155 135 C145 115 148 95 160 90Z"
+                fill="#060606" opacity="0.8" />
+            <path
+                d="M220 90 C220 90 215 130 205 145 C195 160 185 165 190 175 C200 165 215 155 225 135 C235 115 232 95 220 90Z"
+                fill="#060606" opacity="0.8" />
+            <!-- Face shadow -->
+            <ellipse cx="190" cy="130" rx="45" ry="40" fill="url(#glowFace)" opacity="0.6" />
+            <!-- Subtle eye glow -->
+            <ellipse cx="175" cy="125" rx="5" ry="3" fill="#00aa44" opacity="0.35" />
+            <ellipse cx="205" cy="125" rx="5" ry="3" fill="#00aa44" opacity="0.35" />
+            <!-- Hands on table -->
+            <path
+                d="M120 420 C110 415 100 420 100 430 L100 450 C100 460 105 465 115 465 L265 465 C275 465 280 460 280 450 L280 430 C280 420 270 415 260 420 L220 410 L160 410 Z"
+                fill="#151515" stroke="#1a2e1a" stroke-width="0.5" />
+            <!-- Fingers hint -->
+            <path
+                d="M140 410 L138 395 M160 410 L158 393 M180 410 L179 392 M200 410 L201 392 M220 410 L222 394 M240 410 L242 396"
+                stroke="#1a1a1a" stroke-width="4" stroke-linecap="round" />
+            <!-- Jacket folds -->
+            <path d="M190 200 L170 350 M190 200 L210 350" stroke="#161616" stroke-width="1.5" opacity="0.6" />
+            <path d="M130 280 C145 290 165 295 190 295 C215 295 235 290 250 280" stroke="#181818" stroke-width="1"
+                opacity="0.5" fill="none" />
+        </svg>
+    </div>
+
+    <!-- Corner brackets -->
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+
+    <!-- Reticle -->
+    <div class="reticle"></div>
+
+    <!-- Main UI content -->
+    <div class="main-ui">
+        <div class="status-bar">[ SYSTEM ACTIVE ] — THREAT MONITORING ENABLED</div>
+        <h1 class="logo">SentinelNet</h1>
+        <p class="subtitle">Intrusion Detection System</p>
+        <div class="divider"></div>
+        <p class="sys-status">FIREWALL: <span>3 THREATS DETECTED</span> &nbsp;|&nbsp; UPTIME: 99.97%</p>
+
+        <div class="btn-row">
+            <a href="/offline-mode" class="btn btn-danger">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18.364 5.636a9 9 0 010 12.728M5.636 5.636a9 9 0 000 12.728M1 1l22 22" />
+                </svg> Offline Mode
+            </a>
+            <a href="/online-mode" class="btn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" />
+                </svg> Online Mode
+            </a>
+        </div>
+
+        <div class="team-strip">
+            <span>AGENT_01</span>
+            <span class="team-sep">|</span>
+            <span>AGENT_02</span>
+            <span class="team-sep">|</span>
+            <span>AGENT_03</span>
+        </div>
+    </div>
+
+    <script>
+        // Matrix rain in green (matching the image)
+        const canvas = document.getElementById('matrix-canvas');
+        const ctx = canvas.getContext('2d');
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ01アBCDEF0123456789ABCDEF<>{}[]|/\\=+-*#@!'.split('');
+        const fontSize = 13;
+        let cols, drops;
+
+        function init() {
+            cols = Math.floor(canvas.width / fontSize);
+            drops = Array(cols).fill(1).map(() => Math.random() * -100);
+        }
+        init();
+        window.addEventListener('resize', init);
+
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            for (let i = 0; i < drops.length; i++) {
+                const char = chars[Math.floor(Math.random() * chars.length)];
+                const x = i * fontSize;
+                const y = drops[i] * fontSize;
+
+                // Bright head
+                if (Math.random() > 0.95) {
+                    ctx.fillStyle = '#ffffff';
+                } else if (drops[i] * fontSize > canvas.height * 0.7) {
+                    ctx.fillStyle = '#003300';
+                } else {
+                    ctx.fillStyle = '#00ff41';
+                }
+
+                ctx.font = fontSize + 'px Share Tech Mono, monospace';
+                ctx.fillText(char, x, y);
+
+                if (y > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i] += 0.5;
+            }
+        }
+
+        setInterval(drawMatrix, 45);
+    </script>
+</body>
+
+</html>

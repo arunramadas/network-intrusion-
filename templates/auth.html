@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Guardian - Authentication</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+         :root {
+            --green: #00ff41;
+            --green-dim: #00cc33;
+            --green-dark: #003300;
+            --green-glow: rgba(0, 255, 65, 0.15);
+            --red: #ff2020;
+            --red-glow: rgba(255, 32, 32, 0.3);
+            --bg: #020a02;
+            --panel: rgba(0, 20, 0, 0.85);
+            --border: rgba(0, 255, 65, 0.25);
+            --border-bright: rgba(0, 255, 65, 0.7);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: var(--bg);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Share Tech Mono', monospace;
+            overflow: hidden;
+            position: relative;
+        }
+        /* Matrix rain canvas */
+        
+        #matrix-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.18;
+        }
+        /* Scanlines overlay */
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.08) 2px, rgba(0, 0, 0, 0.08) 4px);
+            z-index: 1;
+            pointer-events: none;
+        }
+        /* Vignette */
+        
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.85) 100%);
+            z-index: 1;
+            pointer-events: none;
+        }
+        
+        .container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 440px;
+            padding: 1rem;
+        }
+        /* Terminal window frame */
+        
+        .terminal-window {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            box-shadow: 0 0 40px rgba(0, 255, 65, 0.08), 0 0 80px rgba(0, 255, 65, 0.04), inset 0 0 60px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+        /* Terminal title bar */
+        
+        .title-bar {
+            background: rgba(0, 255, 65, 0.08);
+            border-bottom: 1px solid var(--border);
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .title-bar-dots {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        
+        .dot-red {
+            background: #ff3b30;
+        }
+        
+        .dot-yellow {
+            background: #ffcc00;
+        }
+        
+        .dot-green {
+            background: var(--green);
+            box-shadow: 0 0 6px var(--green);
+        }
+        
+        .title-bar-text {
+            font-size: 11px;
+            color: rgba(0, 255, 65, 0.6);
+            letter-spacing: 0.15em;
+            flex: 1;
+            text-align: center;
+        }
+        /* Main content */
+        
+        .card-body {
+            padding: 2rem 2.5rem 2.5rem;
+        }
+        /* Icon area */
+        
+        .icon-section {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .hex-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 80px;
+            height: 80px;
+            background: rgba(0, 255, 65, 0.06);
+            border: 1px solid var(--border-bright);
+            border-radius: 4px;
+            position: relative;
+            margin-bottom: 1.2rem;
+        }
+        
+        .hex-icon::before,
+        .hex-icon::after {
+            content: '';
+            position: absolute;
+            border: 1px solid rgba(0, 255, 65, 0.3);
+        }
+        
+        .hex-icon::before {
+            top: -6px;
+            left: -6px;
+            right: -6px;
+            bottom: -6px;
+            border-radius: 6px;
+        }
+        
+        .hex-icon::after {
+            top: -12px;
+            left: -12px;
+            right: -12px;
+            bottom: -12px;
+            border-radius: 8px;
+            border-color: rgba(0, 255, 65, 0.12);
+        }
+        
+        .hex-icon i {
+            font-size: 2rem;
+            color: var(--green);
+            filter: drop-shadow(0 0 8px var(--green));
+        }
+        
+        .system-label {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 0.3em;
+            color: rgba(0, 255, 65, 0.5);
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        
+        .page-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: var(--green);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            text-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+        }
+        /* Flash message */
+        
+        .flash-message {
+            background: rgba(255, 32, 32, 0.1);
+            border: 1px solid rgba(255, 32, 32, 0.4);
+            border-left: 3px solid var(--red);
+            padding: 10px 14px;
+            margin-bottom: 1.5rem;
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: #ff6060;
+        }
+        /* Form group */
+        
+        .form-group {
+            margin-bottom: 1.2rem;
+        }
+        
+        .input-label {
+            font-size: 10px;
+            letter-spacing: 0.2em;
+            color: rgba(0, 255, 65, 0.5);
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 6px;
+        }
+        
+        .input-wrapper {
+            position: relative;
+        }
+        
+        .input-wrapper i.prefix {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(0, 255, 65, 0.4);
+            font-size: 14px;
+        }
+        
+        .form-input {
+            width: 100%;
+            background: rgba(0, 255, 65, 0.04);
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            padding: 12px 12px 12px 40px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 14px;
+            color: var(--green);
+            outline: none;
+            transition: all 0.2s;
+            letter-spacing: 0.05em;
+        }
+        
+        .form-input::placeholder {
+            color: rgba(0, 255, 65, 0.25);
+            letter-spacing: 0.05em;
+        }
+        
+        .form-input:focus {
+            border-color: var(--green-dim);
+            background: rgba(0, 255, 65, 0.07);
+            box-shadow: 0 0 0 1px rgba(0, 255, 65, 0.2), 0 0 20px rgba(0, 255, 65, 0.05);
+        }
+        
+        .toggle-password {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: rgba(0, 255, 65, 0.35);
+            font-size: 13px;
+            transition: color 0.2s;
+        }
+        
+        .toggle-password:hover {
+            color: var(--green);
+        }
+        /* Remember me */
+        
+        .remember-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .remember-row input[type="checkbox"] {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: transparent;
+            border: 1px solid var(--border-bright);
+            border-radius: 2px;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .remember-row input[type="checkbox"]:checked {
+            background: rgba(0, 255, 65, 0.2);
+        }
+        
+        .remember-row input[type="checkbox"]:checked::after {
+            content: '✓';
+            position: absolute;
+            top: -2px;
+            left: 2px;
+            font-size: 12px;
+            color: var(--green);
+        }
+        
+        .remember-row label {
+            font-size: 12px;
+            color: rgba(0, 255, 65, 0.5);
+            cursor: pointer;
+            letter-spacing: 0.1em;
+        }
+        /* Submit button */
+        
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: rgba(0, 255, 65, 0.08);
+            border: 1px solid var(--green-dim);
+            border-radius: 2px;
+            color: var(--green);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
+            margin-bottom: 1.5rem;
+        }
+        
+        .submit-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 65, 0.12), transparent);
+            transition: left 0.4s;
+        }
+        
+        .submit-btn:hover {
+            background: rgba(0, 255, 65, 0.14);
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.15);
+        }
+        
+        .submit-btn:hover::before {
+            left: 100%;
+        }
+        
+        .submit-btn i {
+            margin-right: 8px;
+        }
+        /* Divider */
+        
+        .divider {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin-bottom: 1.2rem;
+        }
+        /* Footer link */
+        
+        .footer-text {
+            text-align: center;
+            font-size: 12px;
+            color: rgba(0, 255, 65, 0.4);
+            letter-spacing: 0.05em;
+        }
+        
+        .footer-text a {
+            color: var(--green);
+            text-decoration: none;
+            border-bottom: 1px solid rgba(0, 255, 65, 0.3);
+            padding-bottom: 1px;
+            transition: all 0.2s;
+        }
+        
+        .footer-text a:hover {
+            color: #fff;
+            border-color: #fff;
+        }
+        /* Bottom terminal status */
+        
+        .terminal-status {
+            border-top: 1px solid var(--border);
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 255, 65, 0.03);
+        }
+        
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 6px var(--green);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%,
+            100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.3;
+            }
+        }
+        
+        .status-text {
+            font-size: 10px;
+            color: rgba(0, 255, 65, 0.4);
+            letter-spacing: 0.15em;
+        }
+        /* Glitch effect on title */
+        
+        @keyframes glitch {
+            0% {
+                text-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+            }
+            2% {
+                text-shadow: 2px 0 0 #ff0000, -2px 0 0 #00ffff, 0 0 20px rgba(0, 255, 65, 0.5);
+            }
+            4% {
+                text-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+            }
+            96% {
+                text-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+            }
+            98% {
+                text-shadow: -2px 0 0 #ff0000, 2px 0 0 #00ffff, 0 0 20px rgba(0, 255, 65, 0.5);
+            }
+            100% {
+                text-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+            }
+        }
+        
+        .page-title {
+            animation: glitch 4s infinite;
+        }
+        /* Corner accents */
+        
+        .corner-accent {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+        }
+        
+        .corner-accent.tl {
+            top: 0;
+            left: 0;
+            border-top: 2px solid var(--green);
+            border-left: 2px solid var(--green);
+        }
+        
+        .corner-accent.tr {
+            top: 0;
+            right: 0;
+            border-top: 2px solid var(--green);
+            border-right: 2px solid var(--green);
+        }
+        
+        .corner-accent.bl {
+            bottom: 0;
+            left: 0;
+            border-bottom: 2px solid var(--green);
+            border-left: 2px solid var(--green);
+        }
+        
+        .corner-accent.br {
+            bottom: 0;
+            right: 0;
+            border-bottom: 2px solid var(--green);
+            border-right: 2px solid var(--green);
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="matrix-canvas"></canvas>
+
+    <div class="container">
+        <div class="terminal-window" style="position:relative;">
+            <div class="corner-accent tl"></div>
+            <div class="corner-accent tr"></div>
+            <div class="corner-accent bl"></div>
+            <div class="corner-accent br"></div>
+
+            <!-- Title bar -->
+            <div class="title-bar">
+                <div class="title-bar-dots">
+                    <div class="dot dot-red"></div>
+                    <div class="dot dot-yellow"></div>
+                    <div class="dot dot-green"></div>
+                </div>
+                <div class="title-bar-text">NETWORK_GUARDIAN :: AUTH_MODULE v2.4.1</div>
+            </div>
+
+            <!-- Body -->
+            <div class="card-body">
+                <!-- Icon & title -->
+                <div class="icon-section">
+                    <div class="hex-icon">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <div class="system-label">// SECURE ACCESS</div>
+                    <div class="page-title">
+                        {% if action == 'Login' %}LOGIN{% else %}REGISTER{% endif %}
+                    </div>
+                </div>
+
+                <!-- Flash messages -->
+                {% with messages = get_flashed_messages() %} {% if messages %}
+                <div class="flash-message">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>{{ messages[0] }}</span>
+                </div>
+                {% endif %} {% endwith %}
+
+                <!-- Form -->
+                <form method="POST" class="space-y-0">
+                    {% if action == 'Register' %}
+                    <div class="form-group">
+                        <label class="input-label">// username</label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-user prefix"></i>
+                            <input type="text" name="username" placeholder="enter_username" required class="form-input">
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="form-group">
+                        <label class="input-label">// email_address</label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-at prefix"></i>
+                            <input type="email" name="email" placeholder="user@domain.net" required class="form-input">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="input-label">// password</label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-key prefix"></i>
+                            <input type="password" name="password" id="password" placeholder="••••••••••••" required class="form-input">
+                            <span class="toggle-password" onclick="togglePwd('password')">
+                                <i class="fas fa-eye-slash"></i>
+                            </span>
+                        </div>
+                    </div>
+
+                    {% if action == 'Register' %}
+                    <div class="form-group">
+                        <label class="input-label">// confirm_password</label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-shield-alt prefix"></i>
+                            <input type="password" name="confirm_password" id="confirm_password" placeholder="••••••••••••" required class="form-input">
+                            <span class="toggle-password" onclick="togglePwd('confirm_password')">
+                                <i class="fas fa-eye-slash"></i>
+                            </span>
+                        </div>
+                    </div>
+                    {% endif %} {% if action == 'Login' %}
+                    <div class="remember-row">
+                        <input type="checkbox" name="remember" id="remember">
+                        <label for="remember">// persist_session</label>
+                    </div>
+                    {% else %}
+                    <div style="margin-bottom:1.5rem;"></div>
+                    {% endif %}
+
+                    <button type="submit" class="submit-btn">
+                        <i class="fas fa-terminal"></i>
+                        {% if action == 'Login' %}AUTHENTICATE{% else %}INITIALIZE_ACCOUNT{% endif %}
+                    </button>
+                </form>
+
+                <hr class="divider">
+
+                <div class="footer-text">
+                    {% if action == 'Register' %} Already have credentials? <a href="{{ url_for('login') }}">Access
+                        system</a> {% else %} No credentials? <a href="{{ url_for('register') }}">Request access</a> {% endif %}
+                </div>
+            </div>
+
+            <!-- Status bar -->
+            <div class="terminal-status">
+                <div class="status-dot"></div>
+                <div class="status-text">ENCRYPTION: AES-256 &nbsp;|&nbsp; CONN: SECURE &nbsp;|&nbsp; FIREWALL: ACTIVE
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Matrix rain
+        const canvas = document.getElementById('matrix-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const chars = '0123456789ABCDEF<>/{}[]()#@!$%^&*ｦｧｨｩｪｫｬｭｮｯｰアイウエオカキクケコ';
+        const fontSize = 13;
+        const cols = Math.floor(canvas.width / fontSize);
+        const drops = Array(cols).fill(1);
+
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(0,0,0,0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#00ff41';
+            ctx.font = fontSize + 'px Share Tech Mono';
+            for (let i = 0; i < drops.length; i++) {
+                const c = chars[Math.floor(Math.random() * chars.length)];
+                ctx.fillStyle = Math.random() > 0.95 ? '#ffffff' : (drops[i] * fontSize < 30 ? '#00ff41' : '#00882a');
+                ctx.fillText(c, i * fontSize, drops[i] * fontSize);
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+                drops[i]++;
+            }
+        }
+
+        setInterval(drawMatrix, 50);
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        function togglePwd(id) {
+            const input = document.getElementById(id);
+            const icon = event.target.closest('.toggle-password').querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('fa-eye-slash', 'fa-eye');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('fa-eye', 'fa-eye-slash');
+            }
+        }
+    </script>
+</body>
+
+</html>
